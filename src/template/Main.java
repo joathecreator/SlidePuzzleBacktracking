@@ -5,6 +5,11 @@ import br.com.davidbuzatto.jsge.geom.Rectangle;
 import br.com.davidbuzatto.jsge.image.Image;
 import java.util.*;
 
+/**
+ *
+ * @author jdavicunha
+ */
+
 public class Main extends EngineFrame {
 
     private static final int TAMANHO = 3;
@@ -34,7 +39,7 @@ public class Main extends EngineFrame {
     public void create() {
         grade = new Peca[TAMANHO][TAMANHO];
         tamanhoPeca = 600 / TAMANHO; 
-        imagemPeca = loadImage("resources/images/brava.png");
+        imagemPeca = loadImage("resources/images/goku.png");
         imagemPeca.resize(600, 600);
         
         botaoShuffle = new Rectangle(825, 50, 150, 40);
@@ -68,10 +73,6 @@ public class Main extends EngineFrame {
     }
 
     private void iniciarBacktracking() {
-        if (!ehSoluvel()) {
-            System.out.println("Estado insolúvel.");
-            return;
-        }
 
         rotaSolucao.clear();
         visitados.clear();
@@ -86,7 +87,7 @@ public class Main extends EngineFrame {
             simulando = true;
             System.out.println("Passos: " + rotaSolucao.size());
         } else {
-            System.out.println("Não foi possível encontrar solução dentro do limite.");
+            System.out.println("Fora do limite!");
         }
     }
 
@@ -133,7 +134,7 @@ public class Main extends EngineFrame {
             int my = getMouseY();
             if (mx >= botaoShuffle.x && mx <= botaoShuffle.x + 150 && my >= botaoShuffle.y && my <= botaoShuffle.y + 40) {
                 simulando = false;
-                embaralharValido();
+                embaralhar();
             }
             if (mx >= botaoResolver.x && mx <= botaoResolver.x + 150 && my >= botaoResolver.y && my <= botaoResolver.y + 40) {
                 if(!simulando) iniciarBacktracking();
@@ -161,7 +162,7 @@ public class Main extends EngineFrame {
         
         drawText("Movimentos:", 825, 150, 20, BLACK);
         String texto = simulando ? (passoAtual + " / " + rotaSolucao.size()) : String.valueOf(contadorMovimentos);
-        drawText(texto, 825, 180, 30, BLUE);
+        drawText(texto, 825, 180, 30, BLACK);
     }
 
     private String lerEstadoAtual() {
@@ -197,7 +198,7 @@ public class Main extends EngineFrame {
         }
     }
 
-    private void embaralharValido() {
+    private void embaralhar() {
         inicializarGrade();
         for (int i = 0; i < 100; i++) {
             int lv=-1, cv=-1;

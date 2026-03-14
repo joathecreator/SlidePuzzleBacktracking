@@ -7,8 +7,9 @@ import br.com.davidbuzatto.jsge.math.Vector2;
 
 /**
  *
- * @author jdavi
+ * @author jdavicunha
  */
+
 public class Peca {
     
     private Vector2 pos;
