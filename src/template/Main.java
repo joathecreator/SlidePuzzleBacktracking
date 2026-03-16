@@ -1,24 +1,29 @@
 package template;
 
 import br.com.davidbuzatto.jsge.core.engine.EngineFrame;
-import br.com.davidbuzatto.jsge.geom.Rectangle;
 import br.com.davidbuzatto.jsge.image.Image;
+import br.com.davidbuzatto.jsge.imgui.GuiButton;
+import br.com.davidbuzatto.jsge.imgui.GuiInputDialog;
+import java.awt.Color;
 import java.util.*;
 
 /**
- *
  * @author jdavicunha
  */
-
 public class Main extends EngineFrame {
 
     private static final int TAMANHO = 3;
     private Peca[][] grade;
     private double tamanhoPeca;
     private Image imagemPeca;
+
+    private GuiButton botaoShuffle;
+    private GuiButton botaoResolver;
+    private GuiButton botaoDefinirLimite;
+
+    private GuiInputDialog entradaLimite;
     
-    private Rectangle botaoShuffle;
-    private Rectangle botaoResolver;
+    private int limiteProfundidade = 500;
     
     private int contadorMovimentos;
     private boolean simulando;
@@ -26,9 +31,7 @@ public class Main extends EngineFrame {
 
     private List<int[]> rotaSolucao;
     private int passoAtual;
-    
     private final String ESTADO_OBJETIVO = "012345678";
-    
     private HashSet<String> visitados; 
 
     public Main() {
@@ -37,17 +40,119 @@ public class Main extends EngineFrame {
 
     @Override
     public void create() {
+        useAsDependencyForIMGUI();
+        
         grade = new Peca[TAMANHO][TAMANHO];
         tamanhoPeca = 600 / TAMANHO; 
         imagemPeca = loadImage("resources/images/goku.png");
         imagemPeca.resize(600, 600);
+
+        botaoResolver = new GuiButton(25, 50, 150, 40, "BACKTRACK");
+        botaoDefinirLimite = new GuiButton(25, 100, 150, 40, "SET LIMIT");
+        botaoShuffle = new GuiButton(825, 50, 150, 40, "SHUFFLE");
+
+        entradaLimite = new GuiInputDialog("CONFIGURAR LIMITE", "Digite a profundidade máxima (inteiro):", true);
+
+        botaoResolver.setBackgroundColor(Color.DARK_GRAY);
+        botaoShuffle.setBackgroundColor(Color.DARK_GRAY);
+        botaoDefinirLimite.setBackgroundColor(Color.BLUE);
         
-        botaoShuffle = new Rectangle(825, 50, 150, 40);
-        botaoResolver = new Rectangle(25, 50, 150, 40);
+        botaoResolver.setTextColor(WHITE);
+        botaoDefinirLimite.setTextColor(WHITE);
+        botaoShuffle.setTextColor(WHITE);
         
         rotaSolucao = new ArrayList<>();
         visitados = new HashSet<>();
         inicializarGrade();
+    }
+
+    @Override
+    public void update(double delta) {
+
+        botaoResolver.update(delta);
+        botaoShuffle.update(delta);
+        botaoDefinirLimite.update(delta);
+        entradaLimite.update(delta);
+
+        if (botaoDefinirLimite.isMousePressed()) {
+            entradaLimite.show();
+        }
+
+        if (entradaLimite.isOkButtonPressed() || entradaLimite.isEnterKeyPressed()) {
+            String valorDigitado = entradaLimite.getValue();
+            if (checarInteiro(valorDigitado)) {
+                limiteProfundidade = Integer.parseInt(valorDigitado);
+                entradaLimite.hide();
+            } else {
+                System.out.println("Erro");
+            }
+        }
+        
+        if (entradaLimite.isCancelButtonPressed() || entradaLimite.isCloseButtonPressed()) {
+            entradaLimite.hide();
+        }
+
+        if (botaoResolver.isMousePressed() && !simulando) {
+            iniciarBacktracking();
+        }
+
+        if (botaoShuffle.isMousePressed()) {
+            simulando = false;
+            embaralhar();
+        }
+
+        if (simulando && passoAtual < rotaSolucao.size()) {
+            framesSimulacao++;
+            if (framesSimulacao >= 2) { 
+                int[] p = rotaSolucao.get(passoAtual);
+                realizarMovimentoVazio(p[0], p[1]);
+                passoAtual++;
+                framesSimulacao = 0;
+                if (passoAtual == rotaSolucao.size()) simulando = false;
+            }
+        }
+
+        if (isMouseButtonPressed(MOUSE_BUTTON_LEFT) && !simulando) {
+            int mx = getMouseX();
+            int my = getMouseY();
+            if (mx >= 200 && mx <= 800) {
+                for (int i=0; i<3; i++) for (int j=0; j<3; j++) 
+                    if (grade[i][j] != null && grade[i][j].intercepta(mx, my)) moverPeca(i, j);
+            }
+        }
+    }
+
+    @Override
+    public void draw() {
+        clearBackground(WHITE);
+        
+        for (int i=0; i<3; i++) 
+            for (int j=0; j<3; j++) 
+                if (grade[i][j] != null) grade[i][j].desenhar(this, 3);
+        
+        fillRectangle(0, 0, 200, 600, LIGHTGRAY);
+        fillRectangle(800, 0, 200, 600, LIGHTGRAY);
+
+        botaoResolver.draw();
+        botaoDefinirLimite.draw();
+        botaoShuffle.draw();
+        entradaLimite.draw();
+
+        drawText("Limite Atual:", 25, 160, 18, BLACK);
+        drawText(String.valueOf(limiteProfundidade), 25, 185, 22, BLACK);
+
+        drawText("Movimentos:", 825, 150, 20, BLACK);
+        String texto = simulando ? (passoAtual + " / " + rotaSolucao.size()) : String.valueOf(contadorMovimentos);
+        drawText(texto, 825, 180, 30, BLACK);
+    }
+
+    private boolean checarInteiro(String str) {
+        try {
+            int val = Integer.parseInt(str);
+            return val >= 0;
+        } catch (NumberFormatException e) {
+            return false;
+        }
     }
 
     private void inicializarGrade() {
@@ -61,52 +166,33 @@ public class Main extends EngineFrame {
         simulando = false;
     }
 
-    private boolean ehSoluvel() {
-        String s = lerEstadoAtual().replace("8", "");
-        int inversoes = 0;
-        for (int i = 0; i < s.length(); i++) {
-            for (int j = i + 1; j < s.length(); j++) {
-                if (s.charAt(i) > s.charAt(j)) inversoes++;
-            }
-        }
-        return (inversoes % 2 == 0);
-    }
-
     private void iniciarBacktracking() {
-
         rotaSolucao.clear();
         visitados.clear();
         passoAtual = 0;
         contadorMovimentos = 0;
-
         String inicial = lerEstadoAtual();
         int lv = -1, cv = -1;
         for(int i=0; i<TAMANHO; i++) for(int j=0; j<TAMANHO; j++) if(grade[i][j] == null) { lv=i; cv=j; }
 
         if (executarBacktracking(inicial, lv, cv, 0)) { 
             simulando = true;
-            System.out.println("Passos: " + rotaSolucao.size());
         } else {
-            System.out.println("Fora do limite!");
+            System.out.println("Solução não encontrada no limite de " + limiteProfundidade);
         }
     }
 
     private boolean executarBacktracking(String estado, int lv, int cv, int profundidade) {
-
-        if (profundidade > 500) return false;
-
+        if (profundidade > limiteProfundidade) return false;
         if (estado.equals(ESTADO_OBJETIVO)) return true;
-        
         if (visitados.contains(estado)) return false;
         visitados.add(estado);
 
         int[] vL = {-1, 0, 1, 0}, vC = {0, 1, 0, -1};
         for (int i = 0; i < 4; i++) {
             int nL = lv + vL[i], nC = cv + vC[i];
-            
             if (nL >= 0 && nL < TAMANHO && nC >= 0 && nC < TAMANHO) {
                 String proximo = trocar(estado, lv, cv, nL, nC);
-
                 if (executarBacktracking(proximo, nL, nC, profundidade + 1)) {
                     rotaSolucao.add(0, new int[]{nL, nC}); 
                     return true;
@@ -114,55 +200,6 @@ public class Main extends EngineFrame {
             }
         }
         return false;
-    }
-
-    @Override
-    public void update(double delta) {
-        if (simulando && passoAtual < rotaSolucao.size()) {
-            framesSimulacao++;
-            if (framesSimulacao >= 2) { 
-                int[] p = rotaSolucao.get(passoAtual);
-                realizarMovimentoVazio(p[0], p[1]);
-                passoAtual++;
-                framesSimulacao = 0;
-                if (passoAtual == rotaSolucao.size()) simulando = false;
-            }
-        }
-
-        if (isMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-            int mx = getMouseX();
-            int my = getMouseY();
-            if (mx >= botaoShuffle.x && mx <= botaoShuffle.x + 150 && my >= botaoShuffle.y && my <= botaoShuffle.y + 40) {
-                simulando = false;
-                embaralhar();
-            }
-            if (mx >= botaoResolver.x && mx <= botaoResolver.x + 150 && my >= botaoResolver.y && my <= botaoResolver.y + 40) {
-                if(!simulando) iniciarBacktracking();
-            }
-            if (!simulando) {
-                for (int i=0; i<3; i++) for (int j=0; j<3; j++) 
-                    if (grade[i][j] != null && grade[i][j].intercepta(mx, my)) moverPeca(i, j);
-            }
-        }
-    }
-
-    @Override
-    public void draw() {
-        clearBackground(WHITE);
-        for (int i=0; i<3; i++) for (int j=0; j<3; j++) if (grade[i][j] != null) grade[i][j].desenhar(this, 3);
-        
-        fillRectangle(0, 0, 200, 600, LIGHTGRAY);
-        fillRectangle(800, 0, 200, 600, LIGHTGRAY);
-        
-        fillRectangle(botaoResolver.x, botaoResolver.y, 150, 40, DARKGRAY);
-        drawText("BACKTRACK", (int)botaoResolver.x + 20, (int)botaoResolver.y + 12, 20, WHITE);
-        
-        fillRectangle(botaoShuffle.x, botaoShuffle.y, 150, 40, DARKGRAY);
-        drawText("SHUFFLE", (int)botaoShuffle.x + 35, (int)botaoShuffle.y + 12, 20, WHITE);
-        
-        drawText("Movimentos:", 825, 150, 20, BLACK);
-        String texto = simulando ? (passoAtual + " / " + rotaSolucao.size()) : String.valueOf(contadorMovimentos);
-        drawText(texto, 825, 180, 30, BLACK);
     }
 
     private String lerEstadoAtual() {
