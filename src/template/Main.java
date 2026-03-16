@@ -178,7 +178,7 @@ public class Main extends EngineFrame {
         if (executarBacktracking(inicial, lv, cv, 0)) { 
             simulando = true;
         } else {
-            System.out.println("Solução não encontrada no limite de " + limiteProfundidade);
+            System.out.println("Solucao nao encontrada no limite de " + limiteProfundidade);
         }
     }
 
